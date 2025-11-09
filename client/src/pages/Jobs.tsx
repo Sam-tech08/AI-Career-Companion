@@ -59,6 +59,17 @@ const Jobs: React.FC = () => {
   const [modifiedResume, setModifiedResume] = useState('');
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [selectedPreviewText, setSelectedPreviewText] = useState('');
+  // Base URL for API calls. Set REACT_APP_API_URL in client .env (e.g. http://localhost:5001) to target a backend
+  const rawApiBase = process.env.REACT_APP_API_URL ?? '';
+  const API_BASE = rawApiBase.replace(/\/+$/g, ''); // remove trailing slash(es)
+
+  const getApiUrl = (path: string) => {
+    // if API_BASE is provided use absolute URL, otherwise use relative path so CRA proxy can apply
+    if (API_BASE && API_BASE.length > 0) {
+      return `${API_BASE}${path.startsWith('/') ? path : '/' + path}`;
+    }
+    return path.startsWith('/') ? path : '/' + path;
+  };
 
   const handlePreviewMouseUp = () => {
     try {
@@ -123,6 +134,74 @@ This resume has been optimized to match the job description with 95% compatibili
     setShowPreview(false);
     setResumeFile(null);
     setSelectedPreviewText('');
+  };
+
+  // Escape text for safe HTML insertion when falling back to print-to-PDF
+  const escapeHtml = (unsafe: string) => {
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  // Generate a PDF from the modified resume (or selection). Tries to use jspdf if available
+  // for a direct download; otherwise falls back to opening a new window and calling print()
+  const generatePDF = async () => {
+    try {
+      const text = (selectedPreviewText && selectedPreviewText.length > 0) ? selectedPreviewText : modifiedResume;
+      if (!text) {
+        alert('Nothing to export as PDF.');
+        return;
+      }
+
+      // Try to dynamically import jspdf so the app still runs if it's not installed.
+  // @ts-ignore - jspdf may be optional in dev; if it's not installed we'll fall back to print-to-PDF
+  const jspdfModule: any = await import('jspdf');
+  const { jsPDF } = jspdfModule;
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const margin = 40;
+      const pageWidth = doc.internal.pageSize.getWidth() - margin * 2;
+      const lineHeight = 12;
+      doc.setFont('Helvetica');
+      doc.setFontSize(12);
+
+      const lines = doc.splitTextToSize(text, pageWidth);
+      let cursorY = margin;
+      for (let i = 0; i < lines.length; i++) {
+        if (cursorY + lineHeight > doc.internal.pageSize.getHeight() - margin) {
+          doc.addPage();
+          cursorY = margin;
+        }
+        doc.text(lines[i], margin, cursorY);
+        cursorY += lineHeight;
+      }
+
+  const filename = `${(selectedJob?.title || 'resume').replace(/[^a-z0-9 _-]/gi, '')}.pdf`;
+      doc.save(filename);
+    } catch (err) {
+      // If jspdf isn't available or something fails, fall back to print-to-PDF
+      try {
+        const text = (selectedPreviewText && selectedPreviewText.length > 0) ? selectedPreviewText : modifiedResume;
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>Resume</title></head><body><pre style="white-space:pre-wrap;font-family:Arial, Helvetica, sans-serif;font-size:12pt;">${escapeHtml(
+          text || ''
+        )}</pre></body></html>`;
+        const newWin = window.open('', '_blank');
+        if (!newWin) {
+          alert('Unable to open new window for print. Please allow popups or install jspdf (npm i jspdf) for direct download.');
+          return;
+        }
+        newWin.document.write(html);
+        newWin.document.close();
+        newWin.focus();
+        // Give the new window a short moment to render then call print
+        setTimeout(() => newWin.print(), 300);
+      } catch (err2) {
+        console.error('PDF generation failed:', err2);
+        alert('Failed to generate PDF. Install jspdf with `npm i jspdf` in the client folder for direct downloads.');
+      }
+    }
   };
 
   return (
@@ -342,12 +421,84 @@ This resume has been optimized to match the job description with 95% compatibili
 
                   <div style={{ display: 'grid', gap: 12 }}>
                   <button
+                    onClick={generatePDF}
+                    style={{
+                      padding: '14px 24px',
+                      background: '#06b6d4',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 16,
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ⬇️ Download PDF
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const textToSend = (selectedPreviewText && selectedPreviewText.length > 0) ? selectedPreviewText : modifiedResume;
+                        if (!textToSend) {
+                          alert('Nothing to export.');
+                          return;
+                        }
+
+                        const payload = {
+                          name: '',
+                          email: '',
+                          phone: '',
+                          location: '',
+                          jobTitle: selectedJob?.title || '',
+                          resumeText: textToSend
+                        };
+
+                        const resp = await fetch(getApiUrl('/api/generate-resume-pdf'), {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(payload)
+                        });
+
+                        if (!resp.ok) {
+                          const errBody = await resp.json().catch(() => ({}));
+                          alert(errBody?.message || 'Failed to generate PDF');
+                          return;
+                        }
+
+                        const blob = await resp.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${(selectedJob?.title || 'resume').replace(/[^a-z0-9 _-]/gi, '_')}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        console.error('LaTeX PDF generation failed', err);
+                        alert('Failed to generate PDF. Make sure server pdflatex is available.');
+                      }
+                    }}
+                    style={{
+                      padding: '14px 24px',
+                      background: '#0ea5a4',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      fontSize: 16,
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🧾 Export as LaTeX PDF
+                  </button>
+                  <button
                     onClick={async () => {
                       try {
                         // Prefer the captured selection inside the preview (captured on mouseup).
                         const resumeToSend = (selectedPreviewText && selectedPreviewText.length > 0) ? selectedPreviewText : modifiedResume;
 
-                        const url = 'http://localhost:5000/api/applications';
+                        const url = getApiUrl('/api/applications');
                         // Debug logs to help trace the request
                         console.log('[Jobs] Submitting application to', url);
                         console.log('[Jobs] resumeToSend preview:', resumeToSend ? resumeToSend.slice(0, 300) : '<empty>');

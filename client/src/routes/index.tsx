@@ -6,6 +6,8 @@ import Projects from "../pages/Projects";
 import AIResumeBuilder from "../pages/AIResumeBuilder";
 import Quiz from "../pages/Quiz";
 import Jobs from "../pages/Jobs";
+import MockInterview from "../pages/MockInterview";
+import MockInterviewSession from "../pages/MockInterviewSession";
 import Contact from "../pages/Contact";
 import Blog from "../pages/Blog";
 import AdminLogin from "../pages/AdminLogin";
@@ -27,6 +29,8 @@ export default function AppRouter() {
         <Route path="/ai-resume-builder" element={<AIResumeBuilder />} />
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/jobs" element={<Jobs />} />
+  <Route path="/mock-interview" element={<MockInterview />} />
+  <Route path="/mock-interview/session" element={<MockInterviewSession />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/blog" element={<Blog />} />
 

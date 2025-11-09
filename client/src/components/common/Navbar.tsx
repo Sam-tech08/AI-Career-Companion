@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 import './Navbar.css';
@@ -13,7 +13,7 @@ const items = [
       { label: "AI Resume Builder", to: "/ai-resume-builder" },
       { label: "Career Quiz", to: "/quiz" },
       { label: "Job Matching", to: "/jobs" },
-      { label: "Interview Prep", to: "/services#interview" },
+      { label: "Interview Prep", to: "/mock-interview" },
     ],
   },
   {
@@ -31,11 +31,27 @@ const items = [
   { label: "Contact", to: "/contact" },
 ];
 
+// Small logo loader with fallback when the image fails to load
+const LogoImg: React.FC = () => {
+  const [failed, setFailed] = useState(false);
+  const logoFile = 'Screenshot 2025-11-08 015759.png';
+  const base = process.env.PUBLIC_URL || '';
+  // Build a normalized path and encode spaces/unsafe chars
+  const logoSrc = encodeURI((base + '/' + logoFile).replace(/\\/g, '/').replace(/\/\/+/g, '/'));
+
+  if (failed) {
+    return <div className="navbar-logo-fallback" aria-hidden="true">MS</div>;
+  }
+
+  return <img src={logoSrc} alt="MasterSolis" onError={() => setFailed(true)} />;
+};
+
 export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-logo">
-        <img src='./Screenshot 2025-11-08 015759.png' alt='MasterSolis' />
+        {/* Logo loader: encode URI so spaces are handled. If the image fails to load, a small text fallback shows. */}
+        <LogoImg />
       </div>
 
       <motion.div

@@ -28,7 +28,7 @@ const AdminDashboard: React.FC = () => {
           return;
         }
 
-        const res = await fetch('http://localhost:5000/auth/profile', {
+        const res = await fetch('/auth/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const json = await res.json();

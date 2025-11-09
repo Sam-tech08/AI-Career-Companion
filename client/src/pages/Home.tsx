@@ -39,8 +39,8 @@ const Home: React.FC = () => {
                                         imageUrl={'🎙️'}
                                         title={'Mock Interview'}
                                         description={'Practice interviews with coached feedback and tips.'}
-                                        onClick={() => navigate('/services')}
-                                        onActionClick={() => navigate('/services')}
+                                        onClick={() => navigate('/mock-interview')}
+                                        onActionClick={() => navigate('/mock-interview')}
                                     />
                                 </div>
                             </div>
